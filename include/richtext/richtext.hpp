@@ -12,7 +12,7 @@ namespace richtext {
 
 
 enum class tag {
-  undefined, normal, emphasis, strong
+  undefined, normal, strong, emphasis, strong_emphasis 
 };
 
 
@@ -20,15 +20,20 @@ class span {
 public:
 
   span() noexcept = default;
-  span(span const&) = default;
-  span& operator = (span const&) = default;
+  span(span const&) = delete;
+  span& operator = (span const&) = delete;
   span(span&&) noexcept = default;
   span& operator = (span&&) noexcept = default;
   enum tag tag() const noexcept { return tag_; }
   std::string const& text() const noexcept { return text_; }
+  bool empty() const noexcept { return text_.empty(); }
 
   span(enum tag tag, std::string text) noexcept:
     tag_{tag}, text_{std::move(text)}
+  { }
+
+  explicit span(std::string text) noexcept:
+    tag_{tag::normal}, text_{std::move(text)}
   { }
 
 private:
@@ -45,14 +50,35 @@ public:
   using const_iterator = items_type::const_iterator;
 
   text() = default;
-  text(text const&) = default;
-  text& operator = (text const&) = default;
+  text(text const&) = delete;
+  text& operator = (text const&) = delete;
   text(text&&) = default;
-  text& operator = (text&&) = default;
+  text& operator = (text&&) = default;  
   const_iterator begin() const noexcept { return items_.begin(); }
   const_iterator end() const noexcept { return items_.end(); }
   bool empty() const noexcept { return items_.empty(); }
-  void add(span span) { items_.emplace_back(std::move(span)); }
+
+  explicit text(std::string text) {
+    items_.emplace_back(span{ std::move(text) });
+  }
+
+  
+  text&& add(span span) {
+    items_.emplace_back(std::move(span));
+    return std::move(*this);
+  }
+
+
+  text&& add(std::string text) {
+    items_.emplace_back(span{ std::move(text) });
+    return std::move(*this);
+  }
+
+
+  text&& add(tag tag, std::string text) {
+    items_.emplace_back(span{ tag, std::move(text) });
+    return std::move(*this);
+  }
 
 private:
 
@@ -64,12 +90,30 @@ class paragraph {
 public:
 
   paragraph() = default;
-  paragraph(paragraph const&) = default;
-  paragraph& operator = (paragraph const&) = default;
+  paragraph(paragraph const&) = delete;
+  paragraph& operator = (paragraph const&) = delete;
   paragraph(paragraph&&) = default;
   paragraph& operator = (paragraph&&) = default;
   explicit paragraph(text text) noexcept: text_{std::move(text)} { }
+  explicit paragraph(std::string text) noexcept: text_{std::move(text)} { }
   text const& text() const noexcept { return text_; }
+
+  paragraph&& add(span span) {
+    text_.add(std::move(span));
+    return std::move(*this);
+  }
+
+
+  paragraph&& add(std::string text) {
+    text_.add(span{ std::move(text) });
+    return std::move(*this);
+  }
+
+
+  paragraph&& add(tag tag, std::string text) {
+    text_.add(span{ tag, std::move(text) });
+    return std::move(*this);
+  }
 
 private:
 
@@ -77,28 +121,37 @@ private:
 };
 
 
+using table_header = std::vector<std::string>;
+using table_row = std::vector<text>;
+
+
 class table {
 public:
 
-  using row= std::vector<text>;
-  using rows = std::list<row>;
-  using const_iterator = rows::const_iterator;
+  using rows_type = std::list<table_row>;
+  using const_iterator = rows_type::const_iterator;
 
   table() = default;
-  table(table const&) = default;
-  table& operator = (table const&) = default;
+  table(table const&) = delete;
+  table& operator = (table const&) = delete;
   table(table&&) = default;
   table& operator = (table&&) = default;
-  explicit table(row header) noexcept: header_{std::move(header)} { }
-  row const& header() const noexcept { return header_; }
+  explicit table(table_header header) noexcept: header_{std::move(header)} { }
+  table_header const& header() const noexcept { return header_; }
   const_iterator begin() const noexcept { return rows_.begin(); }
   const_iterator end() const noexcept { return rows_.end(); }
-  void add(row row) { rows_.emplace_back(std::move(row)); }
+  
+  table&& add(table_row row) {
+    if (row.size() != header_.size())
+      return std::move(*this);
+    rows_.emplace_back(std::move(row));
+    return std::move(*this);
+  }
 
 private:
 
-  row header_;
-  rows rows_;
+  table_header header_;
+  rows_type rows_;
 };
 
 
@@ -112,21 +165,28 @@ class unordered_list {
 public:
 
   using items_type = std::list<fragment_ptr>;
+  using size_type = items_type::size_type;
   using const_iterator = items_type::const_iterator;
 
   unordered_list() = default;
-  unordered_list(unordered_list const&) = default;
-  unordered_list& operator = (unordered_list const&) = default;
-  unordered_list(unordered_list&&) noexcept = default;
-  unordered_list& operator = (unordered_list&&) noexcept = default;
+  unordered_list(unordered_list const&) = delete;
+  unordered_list& operator = (unordered_list const&) = delete;
+  unordered_list(unordered_list&&) = default;
+  unordered_list& operator = (unordered_list&&) = default;
+  explicit unordered_list(std::string header) noexcept: header_{std::move(header)} { }
+  std::string const& header() const noexcept { return header_; }
   const_iterator begin() const noexcept { return items_.begin(); }
   const_iterator end() const noexcept { return items_.end(); }
-  void add(paragraph);
-  void add(unordered_list);
-  void add(ordered_list);
+  bool empty() const noexcept { return items_.empty(); }
+  size_type size() const noexcept { return items_.size(); }
+ 
+  unordered_list&& add(paragraph);
+  unordered_list&& add(unordered_list);
+  unordered_list&& add(ordered_list);
 
 private:
 
+  std::string header_;
   items_type items_;
 };
 
@@ -136,20 +196,27 @@ public:
 
   using items_type = std::list<fragment_ptr>;
   using const_iterator = items_type::const_iterator;
+  using size_type = items_type::size_type;
 
   ordered_list() = default;
-  ordered_list(ordered_list const&) = default;
-  ordered_list& operator = (ordered_list const&) = default;
-  ordered_list(ordered_list&&) noexcept = default;
-  ordered_list& operator = (ordered_list&&) noexcept = default;
+  ordered_list(ordered_list const&) = delete;
+  ordered_list& operator = (ordered_list const&) = delete;
+  ordered_list(ordered_list&&) = default;
+  ordered_list& operator = (ordered_list&&) = default;
+  explicit ordered_list(std::string header) noexcept: header_{ std::move(header) } { }
+  std::string const& header() const noexcept { return header_; }
   const_iterator begin() const noexcept { return items_.begin(); }
   const_iterator end() const noexcept { return items_.end(); }
-  void add(paragraph);
-  void add(unordered_list);
-  void add(ordered_list);
+  bool empty() const noexcept { return items_.empty(); }
+  size_type size() const noexcept { return items_.size(); }
+
+  ordered_list&& add(paragraph);
+  ordered_list&& add(unordered_list);
+  ordered_list&& add(ordered_list);
 
 private:
 
+  std::string header_;
   items_type items_;
 };
 
@@ -162,17 +229,17 @@ enum class fragment_kind {
 class fragment {
 public:
 
-  using item_type = std::variant<std::monostate, class paragraph, class table,
+  using item_type = std::variant<std::monostate, paragraph, table,
                                  unordered_list, ordered_list>;
 
   fragment() = default;
-  fragment(fragment const&) = default;
-  fragment& operator = (fragment const&) = default;
+  fragment(fragment const&) = delete;
+  fragment& operator = (fragment const&) = delete;
   fragment(fragment&&) = default;
   fragment& operator = (fragment&&) = default;
   explicit fragment(paragraph paragraph) noexcept: item_{std::move(paragraph)} { }
   explicit fragment(table table) noexcept: item_{std::move(table)} { }
-  explicit fragment(unordered_list unordered_list) noexcept: item_{std::move(unordered_list)} { }
+  explicit fragment(unordered_list unordered_list) noexcept : item_{std::move(unordered_list)} { }
   explicit fragment(ordered_list ordered_list) noexcept: item_{std::move(ordered_list)} { }
   paragraph const* paragraph() const noexcept { return std::get_if<class paragraph>(&item_); }
   table const* table() const noexcept { return std::get_if<class table>(&item_); }
@@ -195,33 +262,39 @@ private:
 };
 
 
-inline void unordered_list::add(paragraph paragraph) {
+inline unordered_list&& unordered_list::add(paragraph paragraph) {
   items_.emplace_back(std::make_unique<fragment>(std::move(paragraph)));
+  return std::move(*this);
 }
 
 
-inline void unordered_list::add(unordered_list unordered_list) {
+inline unordered_list&& unordered_list::add(unordered_list unordered_list) {
   items_.emplace_back(std::make_unique<fragment>(std::move(unordered_list)));
+  return std::move(*this);
 }
 
 
-inline void unordered_list::add(ordered_list ordered_list) {
+inline unordered_list&& unordered_list::add(ordered_list ordered_list) {
   items_.emplace_back(std::make_unique<fragment>(std::move(ordered_list)));
+  return std::move(*this);
 }
 
 
-inline void ordered_list::add(paragraph paragraph) {
+inline ordered_list&& ordered_list::add(paragraph paragraph) {
   items_.emplace_back(std::make_unique<fragment>(std::move(paragraph)));
+  return std::move(*this);
 }
 
 
-inline void ordered_list::add(unordered_list unordered_list) {
+inline ordered_list&& ordered_list::add(unordered_list unordered_list) {
   items_.emplace_back(std::make_unique<fragment>(std::move(unordered_list)));
+  return std::move(*this);
 }
 
 
-inline void ordered_list::add(ordered_list ordered_list) {
+inline ordered_list&& ordered_list::add(ordered_list ordered_list) {
   items_.emplace_back(std::make_unique<fragment>(std::move(ordered_list)));
+  return std::move(*this);
 }
 
 
@@ -231,22 +304,42 @@ public:
   using const_iterator = items_type::const_iterator;
 
   subsection() = default;
-  subsection(subsection const&) = default;
-  subsection& operator = (subsection const&) = default;
+  subsection(subsection const&) = delete;
+  subsection& operator = (subsection const&) = delete;
   subsection(subsection&&) = default;
   subsection& operator = (subsection&&) = default;
-  explicit subsection(text header) noexcept: header_{std::move(header)} { }
+  explicit subsection(std::string header) noexcept: header_{std::move(header)} { }
   const_iterator begin() const noexcept { return items_.begin(); }
   const_iterator end() const noexcept { return items_.end(); }
-  text const& header() const noexcept { return header_; }
-  void add(paragraph paragraph) { items_.emplace_back(fragment{std::move(paragraph)}); }
-  void add(table table) { items_.emplace_back(fragment{std::move(table)}); }
-  void add(unordered_list unordered_list) { items_.emplace_back(fragment{std::move(unordered_list)}); }
-  void add(ordered_list ordered_list) { items_.emplace_back(fragment{std::move(ordered_list)}); }
+  std::string const& header() const noexcept { return header_; }
+  
+  
+  subsection&& add(paragraph paragraph) {
+    items_.emplace_back(fragment{ std::move(paragraph) });
+    return std::move(*this);
+  }
+  
+  
+  subsection&& add(table table) {
+    items_.emplace_back(fragment{std::move(table)});
+    return std::move(*this);
+  }
+
+
+  subsection&& add(unordered_list unordered_list) {
+    items_.emplace_back(fragment{std::move(unordered_list)});
+    return std::move(*this);
+  }
+
+
+  subsection&& add(ordered_list ordered_list) {
+    items_.emplace_back(fragment{std::move(ordered_list)});
+    return std::move(*this);
+  }
 
 private:
 
-  text header_;
+  std::string header_;
   items_type items_;
 };
 
@@ -259,8 +352,8 @@ public:
                                  class subsection>;
 
   subsection_or_fragment() = default;
-  subsection_or_fragment(subsection_or_fragment const&) = default;
-  subsection_or_fragment& operator = (subsection_or_fragment const&) = default;
+  subsection_or_fragment(subsection_or_fragment const&) = delete;
+  subsection_or_fragment& operator = (subsection_or_fragment const&) = delete;
   subsection_or_fragment(subsection_or_fragment&&) = default;
   subsection_or_fragment& operator = (subsection_or_fragment&&) = default;
   explicit subsection_or_fragment(paragraph paragraph) noexcept: item_{std::move(paragraph)} { }
@@ -297,24 +390,48 @@ public:
   using const_iterator = items_type::const_iterator;
 
   section() = default;
-  section(section const&) = default;
-  section& operator = (section const&) = default;
+  section(section const&) = delete;
+  section& operator = (section const&) = delete;
   section(section&&) = default;
   section& operator = (section&&) = default;
-  explicit section(text header) noexcept: header_{std::move(header)} { }
+  explicit section(std::string header) noexcept: header_{std::move(header)} { }
   const_iterator begin() const noexcept { return items_.begin(); }
   const_iterator end() const noexcept { return items_.end(); }
-  text const& header() const noexcept { return header_; }
-  void add(paragraph paragraph) { items_.emplace_back(subsection_or_fragment{std::move(paragraph)}); }
-  void add(table table) { items_.emplace_back(subsection_or_fragment{std::move(table)}); }
-  void add(unordered_list unordered_list) { items_.emplace_back(subsection_or_fragment{std::move(unordered_list)}); }
-  void add(ordered_list ordered_list) { items_.emplace_back(subsection_or_fragment{std::move(ordered_list)}); }
-  void add(subsection subsection) { items_.emplace_back(subsection_or_fragment{std::move(subsection)}); }
+  std::string const& header() const noexcept { return header_; }
+  
+  section&& add(paragraph paragraph) {
+    items_.emplace_back(subsection_or_fragment{ std::move(paragraph) });
+    return std::move(*this);
+  }
+
+
+  section&& add(table table) {
+    items_.emplace_back(subsection_or_fragment{std::move(table)});
+    return std::move(*this);
+  }
+
+
+  section&& add(unordered_list unordered_list) {
+    items_.emplace_back(subsection_or_fragment{std::move(unordered_list)});
+    return std::move(*this);
+  }
+
+
+  section&& add(ordered_list ordered_list) {
+    items_.emplace_back(subsection_or_fragment{std::move(ordered_list)});
+    return std::move(*this);
+  }
+
+
+  section&& add(subsection subsection) {
+    items_.emplace_back(subsection_or_fragment{std::move(subsection)});
+    return std::move(*this);
+  }
 
 
 private:
 
-  text header_;
+  std::string header_;
   items_type items_;
 };
 
@@ -327,8 +444,8 @@ public:
                                  class subsection, class section>;
 
   section_or_fragment() = default;
-  section_or_fragment(section_or_fragment const&) = default;
-  section_or_fragment& operator = (section_or_fragment const&) = default;
+  section_or_fragment(section_or_fragment const&) = delete;
+  section_or_fragment& operator = (section_or_fragment const&) = delete;
   section_or_fragment(section_or_fragment&&) = default;
   section_or_fragment& operator = (section_or_fragment&&) = default;
   explicit section_or_fragment(paragraph paragraph) noexcept: item_{std::move(paragraph)} { }
@@ -368,24 +485,53 @@ public:
   using const_iterator = items_type::const_iterator;
 
   document() = default;
-  document(document const&) = default;
-  document& operator = (document const&) = default;
+  document(document const&) = delete;
+  document& operator = (document const&) = delete;
   document(document&&) = default;
   document& operator = (document&&) = default;
-  explicit document(text header) noexcept: header_{std::move(header)} { }
+  explicit document(std::string header) noexcept: header_{std::move(header)} { }
   const_iterator begin() const noexcept { return items_.begin(); }
   const_iterator end() const noexcept { return items_.end(); }
-  text const& header() const noexcept { return header_; }
-  void add(paragraph paragraph) { items_.emplace_back(section_or_fragment{std::move(paragraph)}); }
-  void add(table table) { items_.emplace_back(section_or_fragment{std::move(table)}); }
-  void add(unordered_list unordered_list) { items_.emplace_back(section_or_fragment{std::move(unordered_list)}); }
-  void add(ordered_list ordered_list) { items_.emplace_back(section_or_fragment{std::move(ordered_list)}); }
-  void add(subsection subsection) { items_.emplace_back(section_or_fragment{std::move(subsection)}); }
-  void add(section section) { items_.emplace_back(section_or_fragment{std::move(section)}); }
+  std::string const& header() const noexcept { return header_; }
+  
+  document&& add(paragraph paragraph) {
+    items_.emplace_back(section_or_fragment{ std::move(paragraph) });
+    return std::move(*this);
+  }
+
+
+  document&& add(table table) {
+    items_.emplace_back(section_or_fragment{std::move(table)});
+    return std::move(*this);
+  }
+
+
+  document&& add(unordered_list unordered_list) {
+    items_.emplace_back(section_or_fragment{std::move(unordered_list)});
+    return std::move(*this);
+  }
+
+
+  document&& add(ordered_list ordered_list) {
+    items_.emplace_back(section_or_fragment{std::move(ordered_list)});
+    return std::move(*this);
+  }
+
+
+  document&& add(subsection subsection) {
+    items_.emplace_back(section_or_fragment{std::move(subsection)});
+    return std::move(*this);
+  }
+
+
+  document&& add(section section) {
+    items_.emplace_back(section_or_fragment{std::move(section)});
+    return std::move(*this);
+  }
 
 private:
 
-  text header_;
+  std::string header_;
   items_type items_;
 
 };
@@ -401,9 +547,7 @@ public:
       return false;
 
     if(!document.header().empty()) {
-      on_document_header_begin(document.header());
-      on_text(document.header());
-      on_document_header_end(document.header());
+      on_document_header(document.header());
     }        
 
     for(auto const& section_or_fragment: document)
@@ -439,39 +583,36 @@ protected:
 
   virtual bool on_document_begin(document const&, std::error_code&) { return true; }  
   virtual bool on_document_end(document const&, std::error_code&) { return true; }
-  virtual void on_document_header_begin(text const&) { }
-  virtual void on_document_header_end(text const&) { }
+  virtual void on_document_header(std::string const&) { }
   virtual void on_text(text const&) { }
   virtual void on_paragraph_begin(paragraph const&) { }
   virtual void on_paragraph_end(paragraph const&) { }
   virtual void on_table_begin(table const&) { }
   virtual void on_table_end(table const&) { }
-  virtual void on_table_header_begin(table::row const&) { }
-  virtual void on_table_header_end(table::row const&) { }
-  virtual void on_table_header_cell_begin(std::size_t, text const&) { }
-  virtual void on_table_header_cell_end(std::size_t, text const&) { }
-  virtual void on_table_header_cell_text(std::size_t, text const&) { }
-  virtual void on_table_row_begin(table::row const&) { }
-  virtual void on_table_row_end(table::row const&) { }
+  virtual void on_table_header_begin(table_header const&) { }
+  virtual void on_table_header_end(table_header const&) { }
+  virtual void on_table_header_cell(std::size_t, std::string const&) { }
+  virtual void on_table_row_begin(table_row const&) { }
+  virtual void on_table_row_end(table_row const&) { }
   virtual void on_table_cell_begin(std::size_t, text const&) { }
   virtual void on_table_cell_end(std::size_t, text const&) { }
   virtual void on_table_cell_text(std::size_t, text const&) { }
   virtual void on_subsection_begin(subsection const&) { }
   virtual void on_subsection_end(subsection const&) { }
-  virtual void on_subsection_header_begin(text const&) { }
-  virtual void on_subsection_header_end(text const&) { }
+  virtual void on_subsection_header(std::string const&) { }
   virtual void on_section_begin(section const&) { }
   virtual void on_section_end(section const&) { }
-  virtual void on_section_header_begin(text const&) { }
-  virtual void on_section_header_end(text const&) { }
+  virtual void on_section_header(std::string const&) { }
   virtual void on_unordered_list_begin(unordered_list const&) { }
   virtual void on_unordered_list_end(unordered_list const&) { }
+  virtual void on_unordered_list_header(std::string const&) { }
   virtual void on_unordered_list_item_begin(fragment const&) { }
   virtual void on_unordered_list_item_end(fragment const&) { }
   virtual void on_ordered_list_begin(ordered_list const&) { }
   virtual void on_ordered_list_end(ordered_list const&) { }
-  virtual void on_ordered_list_item_begin(ordered_list const&) { }
-  virtual void on_ordered_list_item_end(ordered_list const&) { }
+  virtual void on_ordered_list_header(std::string const&) { }
+  virtual void on_ordered_list_item_begin(std::size_t, fragment const&) { }
+  virtual void on_ordered_list_item_end(std::size_t, fragment const&) { }
 
 private:
 
@@ -489,11 +630,8 @@ private:
     if(!table.header().empty()) {
       on_table_header_begin(table.header());
       std::size_t i = 0;
-      for(auto const& column: table.header()) {
-        on_table_header_cell_begin(i, column);
-        on_table_header_cell_text(i, column);
-        on_table_header_cell_end(i, column);
-      }
+      for(std::size_t i = 0; i != table.header().size(); ++i)
+        on_table_header_cell(i, table.header()[i]);
       on_table_header_end(table.header());
     }
 
@@ -518,21 +656,24 @@ private:
   void render(unordered_list const& unordered_list) {
     on_unordered_list_begin(unordered_list);
 
+    if (!unordered_list.header().empty())
+      on_unordered_list_header(unordered_list.header());
+
     for(auto const& item: unordered_list) {
       on_unordered_list_item_begin(*item);
 
       switch(item->kind()) {
         case fragment_kind::paragraph:
           on_text(item->paragraph()->text());
-          continue;
+          break;
         case fragment_kind::unordered_list:
           render(*item->unordered_list());
-          continue;
+          break;
         case fragment_kind::ordered_list:
           render(*item->ordered_list());
-          continue;
+          break;
         default:
-          continue;
+          break;
       }
       
       on_unordered_list_item_end(*item);
@@ -545,24 +686,29 @@ private:
   void render(ordered_list const& ordered_list) {    
     on_ordered_list_begin(ordered_list);
 
-    for(auto const& item: ordered_list) {
-      on_ordered_list_item_begin(ordered_list);
+    if (!ordered_list.header().empty())
+      on_ordered_list_header(ordered_list.header());
+
+    std::size_t i = 1;
+    for (auto const& item : ordered_list) {
+      on_ordered_list_item_begin(i, *item);
 
       switch(item->kind()) {
         case fragment_kind::paragraph:
           on_text(item->paragraph()->text());
-          continue;
+          break;
         case fragment_kind::unordered_list:
           render(*item->unordered_list());
-          continue;
+          break;
         case fragment_kind::ordered_list:
           render(*item->ordered_list());
-          continue;
+          break;
         default:
-          continue;
+          break;
       }
       
-      on_ordered_list_item_end(ordered_list);
+      on_ordered_list_item_end(i, *item);
+      ++i;
     }
 
     on_ordered_list_end(ordered_list);
@@ -573,9 +719,7 @@ private:
     on_subsection_begin(subsection);
 
     if(!subsection.header().empty()) {
-      on_subsection_header_begin(subsection.header());
-      on_text(subsection.header());
-      on_subsection_header_end(subsection.header());
+      on_subsection_header(subsection.header());
     }
 
     for(auto const& fragment: subsection)
@@ -603,10 +747,8 @@ private:
   void render(section const& section) {
     on_section_begin(section);
 
-    if(!section.header().empty()) {
-      on_section_header_begin(section.header());
-      on_text(section.header());
-      on_section_header_end(section.header());
+    if (!section.header().empty()) {
+      on_section_header(section.header());
     }
     
     for(auto const& subsection_or_fragment: section)
