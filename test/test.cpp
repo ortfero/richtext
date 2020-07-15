@@ -8,7 +8,7 @@
 TEST_CASE("richtext") {
 
   using namespace richtext;
-  auto md = formatters::markdown("test.md");
+  formatters::markdown md;
   auto doc = document{ "Document Header" }
     .add(paragraph{ "This is paragraph" })
     .add(paragraph{}
@@ -24,11 +24,12 @@ TEST_CASE("richtext") {
         .add(paragraph{ "Item 2" })
         .add(paragraph{ "Item 3" })))
     .add(subsection{ "Subsection Header" }
-      .add(ordered_list{"Ordered items:"}
+      .add(ordered_list{ "Ordered items:" }
         .add(paragraph{ "Item 1" })
         .add(paragraph{ "Item 2" }))
-      .add(table{ {"Column A", "Column B"} })
-        /*.add()*/);
-  std::error_code ec;
-  md.render(doc, ec);
+      .add(table{ {"Column A", "Column B"} }
+        .add(table_row{}.add(text{ "1" }).add(text{ "2" }))
+        .add(table_row{}.add(text{"3"}).add(text{"4"}))));
+  md.render(doc);
+  std::error_code ec; md.write("test.md", ec);
 }

@@ -7,6 +7,12 @@
 #include <memory>
 #include <system_error>
 
+#if defined(RICHTEXT_USE_SYSTEM_UFORMAT)
+#include <uformat/texter.hpp>
+#else
+#include "bundled/uformat/texter.hpp"
+#endif
+
 
 namespace richtext {
 
@@ -122,7 +128,34 @@ private:
 
 
 using table_header = std::vector<std::string>;
-using table_row = std::vector<text>;
+
+
+class table_row {
+public:
+
+  using items_type = std::vector<text>;
+  using size_type = items_type::size_type;
+  using const_iterator = items_type::const_iterator;
+
+  table_row() = default;
+  table_row(table_row const&) = delete;
+  table_row& operator = (table_row const&) = delete;
+  table_row(table_row&&) = default;
+  table_row& operator = (table_row&&) = default;
+  size_type size() const noexcept { return items_.size(); }
+  const_iterator begin() const noexcept { return items_.begin(); }
+  const_iterator end() const noexcept { return items_.end(); }
+
+  table_row&& add(text text) {
+    items_.emplace_back(std::move(text));
+    return std::move(*this);
+  }
+
+
+private:
+
+  items_type items_;
+};
 
 
 class table {
@@ -540,11 +573,18 @@ private:
 class formatter {
 public:
 
+  using string_type = uformat::continuous_texter::string_type;
+  using size_type = uformat::continuous_texter::size_type;
 
-  bool render(document const& document, std::error_code& ec) {
+  string_type const& string() const noexcept { return texter_.string(); }
+  char const* data() const noexcept { return texter_.data(); }
+  size_type size() const noexcept { return texter_.size(); }
 
-    if(!on_document_begin(document, ec))
-      return false;
+
+
+  void render(document const& document) {
+
+    on_document_begin(document);
 
     if(!document.header().empty()) {
       on_document_header(document.header());
@@ -571,18 +611,39 @@ public:
           render(*section_or_fragment.section());
           continue;
         default:
-          return false;
+          continue;
       }
 
-    if(!on_document_end(document, ec))
+    on_document_end(document);
+  }
+
+
+  bool write(std::string const& filename, std::error_code& ec) const noexcept {
+
+    FILE* file = fopen(filename.data(), "wb+");
+    if (file == nullptr) {
+      ec = std::make_error_code(std::errc(errno));
       return false;
+    }
+
+    auto const written = fwrite(texter_.data(), sizeof(char), texter_.size(), file);
+    fclose(file);
+
+    if (written != texter_.size()) {
+      ec = std::make_error_code(std::errc(errno));
+      return false;
+    }
+    
+    return true;
   }
 
 
 protected:
 
-  virtual bool on_document_begin(document const&, std::error_code&) { return true; }  
-  virtual bool on_document_end(document const&, std::error_code&) { return true; }
+  uformat::continuous_texter& texter() noexcept { return texter_; }
+
+  virtual void on_document_begin(document const&) { }  
+  virtual void on_document_end(document const&) { }
   virtual void on_document_header(std::string const&) { }
   virtual void on_text(text const&) { }
   virtual void on_paragraph_begin(paragraph const&) { }
@@ -615,6 +676,8 @@ protected:
   virtual void on_ordered_list_item_end(std::size_t, fragment const&) { }
 
 private:
+
+  uformat::continuous_texter texter_;
 
 
   void render(paragraph const& paragraph) {

@@ -39,26 +39,20 @@ public:
   markdown() noexcept = default;
   markdown(markdown const&) = delete;
   markdown& operator = (markdown const&) = delete;
-  explicit operator bool() const noexcept { return file_ != nullptr; }
 
 
-  markdown(std::string const& filename, options const& opts = options{}) noexcept:
-    options_{ opts } {
-    file_ = fopen(filename.data(), "wb+");
-    if (file_ == nullptr)
-      return;
-  }
+  explicit markdown(options const& options) noexcept: options_{ options } { }
 
   void on_document_header(std::string const& header) noexcept override {
-    fprintf(file_, "\n# %s\n\n", header.data());
+    texter() << '\n' << '#' << ' ' << header << '\n' << '\n';
   }
 
   void on_section_header(std::string const& header) noexcept override {
-    fprintf(file_, "\n## %s\n\n", header.data());
+    texter() << '\n' << '#' << '#' << ' ' << header << '\n' << '\n';
   }
 
   void on_subsection_header(std::string const& header) noexcept override {
-    fprintf(file_, "\n### %s\n\n", header.data());
+    texter() << '\n' << '#' << '#' << '#' << ' ' << header << '\n' << '\n';
   }
 
 
@@ -69,8 +63,7 @@ public:
 
 
   void on_paragraph_end(paragraph const&) override {
-    fputc('\n', file_);
-    fputc('\n', file_);
+    texter() << '\n' << '\n';
   }
 
 
@@ -81,46 +74,44 @@ public:
 
   void on_table_end(table const&) override {
     table_stack_.pop();
-    fputc('\n', file_);
+    texter() << '\n';
   }
 
 
   void on_table_header_begin(table_header const&) override {
     indent();
-    fputc('|', file_);
+    texter() << '|';
   }
 
 
   void on_table_header_end(table_header const& header) override {
-    fputc('\n', file_);
+    texter() << '\n';
     indent();
-    fputc('|', file_);
+    texter() << '|';
     for (std::size_t i = 0; i != header.size(); ++i)
-      fprintf(file_, "%*c|", header[i].size() + 2, '-');
-    fputc('\n', file_);
+      texter().char_n('-', header[i].size() + 2).print('|');
+    texter() << '\n';
   }
 
 
   void on_table_header_cell(std::size_t, std::string const& text) override {
-    fprintf(file_, " %s |", text.data());
+    texter() << ' ' << text << ' ' << '|';
   }
 
 
   void on_table_row_begin(table_row const&) override {
     indent();
-    fputc('|', file_);
-    fputc(' ', file_);
+    texter() << '|' << ' ';
   }
 
 
   void on_table_row_end(table_row const&) override {
-    fputc('\n', file_);
+    texter() << '\n';
   }
 
 
   void on_table_cell_end(std::size_t, text const&) override {
-    fputc(' ', file_);
-    fputc('|', file_);
+    texter() << ' ' << '|';
   }
 
 
@@ -129,43 +120,50 @@ public:
   }
 
 
+  void on_unordered_list_end(unordered_list const&) override {
+    texter() << '\n';
+  }
+
+
   void on_unordered_list_header(std::string const& header) override {
     indent();
-    fputs(header.data(), file_);
-    fputc('\n', file_);
+    texter() << header << '\n';
   }
 
 
   void on_unordered_list_item_begin(fragment const&) override {
     indent();
-    fputc('-', file_);
-    fputc(' ', file_);
+    texter() << '-' << ' ';
     indent_ += options_.indent();
   }
 
 
   void on_unordered_list_item_end(fragment const&) override {
     indent_ -= options_.indent();
-    fputc('\n', file_);
+    texter() << '\n';
+  }
+
+
+  void on_ordered_list_end(ordered_list const&) override {
+    texter() << '\n';
   }
 
 
   void on_ordered_list_header(std::string const& header) override {
     indent();
-    fputs(header.data(), file_);
-    fputc('\n', file_);
+    texter() << header << '\n';
   }
 
   void on_ordered_list_item_begin(std::size_t i, fragment const&) override {
     indent();
-    fprintf(file_, "%d. ", i);
+    texter() << i << '.' << ' ';
     indent_ += options_.indent();
   }
 
 
   void on_ordered_list_item_end(std::size_t, fragment const&) override {
     indent_ -= options_.indent();
-    fputc('\n', file_);
+    texter() << '\n';
   }
   
 
@@ -181,23 +179,23 @@ private:
   void indent() {
     if (indent_ == 0)
       return;
-    fprintf(file_, "%*c", indent_, ' ');
+    texter().char_n(' ', indent_);
   }
 
 
   void on_span(span const& span) {
     switch (span.tag()) {
     case tag::strong:
-      fprintf(file_, "**%s**", span.text().data());
+      texter() << '*' << '*' << span.text() << '*' << '*';
       return;
     case tag::emphasis:
-      fprintf(file_, "*%s*", span.text().data());
+      texter() << '*' << span.text() << '*';
       return;
     case tag::strong_emphasis:
-      fprintf(file_, "***%s***", span.text().data());
+      texter() << '*' << '*' << '*' << span.text() << '*' << '*' << '*';
       return;
     default:
-      fputs(span.text().data(), file_);
+      texter() << span.text();
       return;
     }
   }
