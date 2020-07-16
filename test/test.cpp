@@ -28,8 +28,8 @@ TEST_CASE("richtext") {
         .add(paragraph{ "Item 1" })
         .add(paragraph{ "Item 2" }))
       .add(table{ {"Column A", "Column B"} }
-        .add(table_row{}.add(text{ "1" }).add(text{ "2" }))
-        .add(table_row{}.add(text{"3"}).add(text{"4"}))));
+        .add(table_row{}.add("1").add("2"))
+        .add(table_row{}.add("3").add("4"))));
   md.render(doc);
   std::error_code ec; md.write("test.md", ec);
 }

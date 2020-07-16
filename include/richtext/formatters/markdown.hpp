@@ -10,9 +10,39 @@
 
 namespace richtext::formatters {
 
+  namespace detail {
+    template<typename S>
+    void escape_markdown(uformat::texter<S>& t, std::string const& string) {
+      for (auto const c : string)
+        switch (c) {
+        case '\\':
+        case '`':
+        case '*':
+        case '_':
+        case '{':
+        case '}':
+        case '[':
+        case ']':
+        case '#':
+        case '+':
+        case '-':
+        case '|':
+          t << '\\' << c;
+          continue;
+        default:
+          t << c;
+          continue;
+        }
+    }
+
+  }
+
+
 
 class markdown: public formatter {
 public:
+
+  using column_width_array = std::vector<formatter::size_type>;
 
   class options {
   public:
@@ -68,7 +98,15 @@ public:
 
 
   void on_table_begin(table const& table) override {
-    table_stack_.emplace(&table);
+    column_width_array columns{table.columns_count()};
+    for (size_type i = 0; i != table.columns_count(); ++i) {
+      columns[i] = table.header()[i].size();
+      for (auto const& row : table) {
+        if (row.at(i).length() > columns[i])
+          columns[i] = row.at(i).length();
+      }
+    }
+    table_stack_.emplace(std::move(columns));
   }
 
 
@@ -94,8 +132,14 @@ public:
   }
 
 
-  void on_table_header_cell(std::size_t, std::string const& text) override {
-    texter() << ' ' << text << ' ' << '|';
+  void on_table_header_cell(std::size_t i, std::string const& text) override {
+    column_width_array const& columns = table_stack_.top();
+    texter() << ' ';
+    if (i == 0)
+      texter().left(columns[0], text);
+    else
+      texter().right(columns[i], text);
+    texter() << ' ' << '|';
   }
 
 
@@ -168,7 +212,7 @@ public:
   
 
 private:
-  using table_stack = std::stack<table const*>;
+  using table_stack = std::stack<column_width_array>;
 
   FILE* file_{nullptr};
   std::size_t indent_{ 0 };
@@ -183,21 +227,66 @@ private:
   }
 
 
+  void write_span(span const& span) {
+
+  }
+
+
+  void left_span(size_type width, span const& span) {
+
+  }
+
+
+  void right_span(size_type width, span const& span) {
+
+  }
+
+
   void on_span(span const& span) {
     switch (span.tag()) {
     case tag::strong:
-      texter() << '*' << '*' << span.text() << '*' << '*';
+      texter() << '*' << '*';
+      escape(span.text());
+      texter() << '*' << '*';
       return;
     case tag::emphasis:
-      texter() << '*' << span.text() << '*';
+      texter() << '*';
+      escape(span.text());
+      texter() << '*';
       return;
     case tag::strong_emphasis:
-      texter() << '*' << '*' << '*' << span.text() << '*' << '*' << '*';
+      texter() << '*' << '*' << '*';
+      escape(span.text());
+      texter() << '*' << '*' << '*';
       return;
     default:
-      texter() << span.text();
+      escape(span.text());
       return;
     }
+  }
+
+
+  void escape(std::string const& string) {
+    for(auto const c: string)
+      switch (c) {
+      case '\\':
+      case '`':
+      case '*':
+      case '_':
+      case '{':
+      case '}':
+      case '[':
+      case ']':
+      case '#':
+      case '+':
+      case '-':
+      case '|':
+        texter() << '\\' << c;
+        continue;
+      default:
+        texter() << c;
+        continue;
+      }
   }
 
 };

@@ -36,6 +36,11 @@
 namespace uformat {
 
 
+  enum class alignment {
+    left, right
+  };
+
+
 
   template<typename S>
   class texter {
@@ -94,6 +99,51 @@ namespace uformat {
 
     template<typename F, typename Arg> texter& as(Arg&& arg, F const& f = F{}) {
       f.print(*this, std::forward<Arg>(arg));
+      return *this;
+    }
+
+
+    template<typename Arg>
+    texter& align(alignment alignment, size_type width, Arg&& arg) {
+      switch (alignment) {
+      case alignment::right:
+        return right(width, std::forward<Arg>(arg));
+      default:
+        return left(width, std::forward<Arg>(arg));
+      }
+    }
+
+
+    template<typename Arg>
+    texter& left(size_type width, Arg&& arg) {
+      size_type const previous_size = string_.size();
+      (*this) << arg;
+      size_type const next_size = string_.size();
+      size_type const n = next_size - previous_size;
+      if (n >= width)
+        return *this;
+      size_types const spaces_count = width - n;
+      for (size_type i = 0; i != spaces_count; ++i)
+        string_.push_back(' ');
+      return *this;
+    }
+
+
+    template<typename Arg>
+    texter& right(size_type width, Arg&& arg) {
+      size_type const previous_size = string_.size();
+      (*this) << arg;
+      size_type const next_size = string_.size();
+      size_type const n = next_size - previous_size;
+      if (n >= width)
+        return *this;
+      size_types const spaces_count = width - n;
+      for (size_type i = 0; i != spaces_count; ++i)
+        string_.push_back(' ');
+      for (size_type i = previous_size; i != next_size; ++i)
+        string_[i + n] = string_[i];
+      for (size_type i = 0; i != spaces_count; ++i)
+        string_[previous_size + i] = ' ';
       return *this;
     }
 

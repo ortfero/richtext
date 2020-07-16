@@ -25,6 +25,8 @@ enum class tag {
 class span {
 public:
 
+  using size_type = std::string::size_type;
+
   span() noexcept = default;
   span(span const&) = delete;
   span& operator = (span const&) = delete;
@@ -33,6 +35,8 @@ public:
   enum tag tag() const noexcept { return tag_; }
   std::string const& text() const noexcept { return text_; }
   bool empty() const noexcept { return text_.empty(); }
+  size_type length() const noexcept { return text_.size(); }
+
 
   span(enum tag tag, std::string text) noexcept:
     tag_{tag}, text_{std::move(text)}
@@ -54,6 +58,7 @@ public:
 
   using items_type = std::list<span>;
   using const_iterator = items_type::const_iterator;
+  using size_type = items_type::size_type;
 
   text() = default;
   text(text const&) = delete;
@@ -63,25 +68,30 @@ public:
   const_iterator begin() const noexcept { return items_.begin(); }
   const_iterator end() const noexcept { return items_.end(); }
   bool empty() const noexcept { return items_.empty(); }
+  size_type count() const noexcept { return items_.size(); }
+  size_type length() const noexcept { return length_; }
 
-  explicit text(std::string text) {
+  explicit text(std::string text) : length_{ text.size() } {
     items_.emplace_back(span{ std::move(text) });
   }
 
   
   text&& add(span span) {
-    items_.emplace_back(std::move(span));
+    length_ += span.length();
+    items_.emplace_back(std::move(span));    
     return std::move(*this);
   }
 
 
   text&& add(std::string text) {
-    items_.emplace_back(span{ std::move(text) });
+    length_ += text.length();
+    items_.emplace_back(span{ std::move(text) });    
     return std::move(*this);
   }
 
 
   text&& add(tag tag, std::string text) {
+    length_ += text.length();
     items_.emplace_back(span{ tag, std::move(text) });
     return std::move(*this);
   }
@@ -89,6 +99,7 @@ public:
 private:
 
   items_type items_;
+  size_type length_{ 0 };
 };
 
 
@@ -133,7 +144,7 @@ using table_header = std::vector<std::string>;
 class table_row {
 public:
 
-  using items_type = std::vector<text>;
+  using items_type = std::vector<span>;
   using size_type = items_type::size_type;
   using const_iterator = items_type::const_iterator;
 
@@ -145,9 +156,15 @@ public:
   size_type size() const noexcept { return items_.size(); }
   const_iterator begin() const noexcept { return items_.begin(); }
   const_iterator end() const noexcept { return items_.end(); }
+  span const& at(size_type i) const noexcept { return items_[i]; }
 
-  table_row&& add(text text) {
-    items_.emplace_back(std::move(text));
+  table_row&& add(std::string text) {
+    items_.emplace_back(span{ std::move(text) });
+    return std::move(*this);
+  }
+
+  table_row&& add(tag tag, std::string text) {
+    items_.emplace_back(span{ tag, std::move(text) });
     return std::move(*this);
   }
 
@@ -163,6 +180,7 @@ public:
 
   using rows_type = std::list<table_row>;
   using const_iterator = rows_type::const_iterator;
+  using size_type = rows_type::size_type;
 
   table() = default;
   table(table const&) = delete;
@@ -173,6 +191,8 @@ public:
   table_header const& header() const noexcept { return header_; }
   const_iterator begin() const noexcept { return rows_.begin(); }
   const_iterator end() const noexcept { return rows_.end(); }
+  size_type columns_count() const noexcept { return header_.size(); }
+  size_type rows_count() const noexcept { return rows_.size(); }
   
   table&& add(table_row row) {
     if (row.size() != header_.size())
