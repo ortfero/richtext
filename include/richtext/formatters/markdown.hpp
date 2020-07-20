@@ -10,34 +10,6 @@
 
 namespace richtext::formatters {
 
-  namespace detail {
-    template<typename S>
-    void escape_markdown(uformat::texter<S>& t, std::string const& string) {
-      for (auto const c : string)
-        switch (c) {
-        case '\\':
-        case '`':
-        case '*':
-        case '_':
-        case '{':
-        case '}':
-        case '[':
-        case ']':
-        case '#':
-        case '+':
-        case '-':
-        case '|':
-          t << '\\' << c;
-          continue;
-        default:
-          t << c;
-          continue;
-        }
-    }
-
-  }
-
-
 
 class markdown: public formatter {
 public:
@@ -228,7 +200,26 @@ private:
 
 
   void write_span(span const& span) {
-
+    switch (span.tag()) {
+    case tag::strong:
+      texter() << '*' << '*';
+      escape(span.text());
+      texter() << '*' << '*';
+      return;
+    case tag::emphasis:
+      texter() << '*';
+      escape(span.text());
+      texter() << '*';
+      return;
+    case tag::strong_emphasis:
+      texter() << '*' << '*' << '*';
+      escape(span.text());
+      texter() << '*' << '*' << '*';
+      return;
+    default:
+      escape(span.text());
+      return;
+    }
   }
 
 
@@ -269,18 +260,9 @@ private:
   void escape(std::string const& string) {
     for(auto const c: string)
       switch (c) {
-      case '\\':
-      case '`':
-      case '*':
-      case '_':
-      case '{':
-      case '}':
-      case '[':
-      case ']':
-      case '#':
-      case '+':
-      case '-':
-      case '|':
+      case '\\': case '`': case '*': case '_':
+      case '{': case '}': case '[': case ']':
+      case '#': case '+': case '-': case '|':
         texter() << '\\' << c;
         continue;
       default:
