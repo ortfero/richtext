@@ -122,7 +122,7 @@ namespace uformat {
       size_type const n = next_size - previous_size;
       if (n >= width)
         return *this;
-      size_types const spaces_count = width - n;
+      size_type const spaces_count = width - n;
       for (size_type i = 0; i != spaces_count; ++i)
         string_.push_back(' ');
       return *this;
@@ -137,11 +137,11 @@ namespace uformat {
       size_type const n = next_size - previous_size;
       if (n >= width)
         return *this;
-      size_types const spaces_count = width - n;
+      size_type const spaces_count = width - n;
       for (size_type i = 0; i != spaces_count; ++i)
         string_.push_back(' ');
       for (size_type i = previous_size; i != next_size; ++i)
-        string_[i + n] = string_[i];
+        string_[i + spaces_count] = string_[i];
       for (size_type i = 0; i != spaces_count; ++i)
         string_[previous_size + i] = ' ';
       return *this;
@@ -203,7 +203,7 @@ namespace uformat {
     }
 
 
-    template<typename T> texter& duoted(T&& arg) {
+    template<typename T> texter& dquoted(T&& arg) {
       string_.push_back('\"');
       (*this) << arg;
       string_.push_back('\"');

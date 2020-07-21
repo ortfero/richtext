@@ -675,9 +675,9 @@ protected:
   virtual void on_table_header_cell(std::size_t, std::string const&) { }
   virtual void on_table_row_begin(table_row const&) { }
   virtual void on_table_row_end(table_row const&) { }
-  virtual void on_table_cell_begin(std::size_t, text const&) { }
-  virtual void on_table_cell_end(std::size_t, text const&) { }
-  virtual void on_table_cell_text(std::size_t, text const&) { }
+  virtual void on_table_cell_begin(std::size_t, span const&) { }
+  virtual void on_table_cell_end(std::size_t, span const&) { }
+  virtual void on_table_cell_text(std::size_t, span const&) { }
   virtual void on_subsection_begin(subsection const&) { }
   virtual void on_subsection_end(subsection const&) { }
   virtual void on_subsection_header(std::string const&) { }

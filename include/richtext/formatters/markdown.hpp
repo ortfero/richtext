@@ -16,6 +16,7 @@ public:
 
   using column_width_array = std::vector<formatter::size_type>;
 
+
   class options {
   public:
 
@@ -60,7 +61,7 @@ public:
 
   void on_text(text const& text) override {
     for (auto const& span : text)
-      on_span(span);
+      do_span(texter(), span);
   }
 
 
@@ -70,7 +71,8 @@ public:
 
 
   void on_table_begin(table const& table) override {
-    column_width_array columns{table.columns_count()};
+    column_width_array columns;
+    columns.resize(table.columns_count());
     for (size_type i = 0; i != table.columns_count(); ++i) {
       columns[i] = table.header()[i].size();
       for (auto const& row : table) {
@@ -98,8 +100,11 @@ public:
     texter() << '\n';
     indent();
     texter() << '|';
-    for (std::size_t i = 0; i != header.size(); ++i)
-      texter().char_n('-', header[i].size() + 2).print('|');
+    if (!header.empty()) {
+      texter().print(':').char_n('-', header[0].size() + 1).print('|');
+      for (std::size_t i = 1; i != header.size(); ++i)
+        texter().char_n('-', header[i].size() + 1).print(':', '|');
+    }
     texter() << '\n';
   }
 
@@ -117,7 +122,7 @@ public:
 
   void on_table_row_begin(table_row const&) override {
     indent();
-    texter() << '|' << ' ';
+    texter() << '|';
   }
 
 
@@ -126,13 +131,18 @@ public:
   }
 
 
-  void on_table_cell_end(std::size_t, text const&) override {
+  void on_table_cell_end(std::size_t, span const&) override {
     texter() << ' ' << '|';
   }
 
 
-  void on_table_cell_text(std::size_t, text const& text) override {
-    on_text(text);
+  void on_table_cell_text(std::size_t i, span const& span) override {
+    texter() << ' ';
+    column_width_array const& columns = table_stack_.top();
+    if (i == 0)
+      left_span(columns[0], span);
+    else
+      right_span(columns[i], span);
   }
 
 
@@ -199,74 +209,54 @@ private:
   }
 
 
-  void write_span(span const& span) {
-    switch (span.tag()) {
-    case tag::strong:
-      texter() << '*' << '*';
-      escape(span.text());
-      texter() << '*' << '*';
-      return;
-    case tag::emphasis:
-      texter() << '*';
-      escape(span.text());
-      texter() << '*';
-      return;
-    case tag::strong_emphasis:
-      texter() << '*' << '*' << '*';
-      escape(span.text());
-      texter() << '*' << '*' << '*';
-      return;
-    default:
-      escape(span.text());
-      return;
-    }
-  }
-
-
   void left_span(size_type width, span const& span) {
-
+    uformat::long_texter t; do_span(t, span);
+    texter().left(width, t);
   }
 
 
   void right_span(size_type width, span const& span) {
-
+    uformat::long_texter t; do_span(t, span);
+    texter().right(width, t);
   }
 
 
-  void on_span(span const& span) {
+  template<typename S>
+  void do_span(uformat::texter<S>& texter, span const& span) {
     switch (span.tag()) {
     case tag::strong:
-      texter() << '*' << '*';
-      escape(span.text());
-      texter() << '*' << '*';
+      texter << '*' << '*';
+      escape(texter, span.text());
+      texter << '*' << '*';
       return;
     case tag::emphasis:
-      texter() << '*';
-      escape(span.text());
-      texter() << '*';
+      texter << '*';
+      escape(texter, span.text());
+      texter << '*';
       return;
     case tag::strong_emphasis:
-      texter() << '*' << '*' << '*';
-      escape(span.text());
-      texter() << '*' << '*' << '*';
+      texter << '*' << '*' << '*';
+      escape(texter, span.text());
+      texter << '*' << '*' << '*';
       return;
     default:
-      escape(span.text());
+      escape(texter, span.text());
       return;
     }
   }
 
 
-  void escape(std::string const& string) {
+  template<typename S>
+  void escape(uformat::texter<S>& texter, std::string const& string) {
     for(auto const c: string)
       switch (c) {
       case '\\': case '`': case '*': case '_':
       case '{': case '}': case '[': case ']':
       case '#': case '+': case '-': case '|':
-        texter() << '\\' << c;
+        texter << '\\' << c;
         continue;
       default:
-        texter() << c;
+        texter << c;
         continue;
       }
   }
