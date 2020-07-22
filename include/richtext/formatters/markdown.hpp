@@ -39,7 +39,7 @@ public:
     std::size_t indent_{ default_indent };
   };
 
-  markdown() noexcept = default;
+  markdown() = default;
   markdown(markdown const&) = delete;
   markdown& operator = (markdown const&) = delete;
 
@@ -100,10 +100,11 @@ public:
     texter() << '\n';
     indent();
     texter() << '|';
-    if (!header.empty()) {
-      texter().print(':').char_n('-', header[0].size() + 1).print('|');
-      for (std::size_t i = 1; i != header.size(); ++i)
-        texter().char_n('-', header[i].size() + 1).print(':', '|');
+    column_width_array const& columns = table_stack_.top();
+    if (!columns.empty()) {
+      texter().print(':').char_n('-', columns[0] + 1).print('|');
+      for (std::size_t i = 1; i != columns.size(); ++i)
+        texter().char_n('-', columns[i] + 1).print(':', '|');
     }
     texter() << '\n';
   }
@@ -196,7 +197,6 @@ public:
 private:
   using table_stack = std::stack<column_width_array>;
 
-  FILE* file_{nullptr};
   std::size_t indent_{ 0 };
   options options_;
   table_stack table_stack_;
