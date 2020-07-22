@@ -607,14 +607,10 @@ namespace uformat {
     return y.compare(x) != 0;
   }
 
-  template<std::size_t N>
-  std::istream& operator >> (std::istream& stream, fixed_string<N>& fs) {
-    return stream >> fs.begin();
-  }
-
-  template<std::size_t N>
-  std::ostream& operator << (std::ostream& stream, fixed_string<N> const& fs) {
-    return stream << fs.begin();
+  template<typename OS, std::size_t N>
+  OS& operator << (OS& stream, fixed_string<N> const& fs) {
+    stream << std::string_view{ fs.data(), fs.size() };
+    return stream;
   }
 
 

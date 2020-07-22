@@ -91,9 +91,13 @@ namespace uformat {
 
 
     texter& char_n(char c, size_type n) {
-      for(size_type i = 0; i != n; ++i)
-        string_.push_back(c);
-      return *this;
+      size_type allocated;
+      char* buffer = allocate(n, allocated);
+      if (!buffer) return *this;
+      char* p = buffer;
+      for (char* p = buffer; p != buffer + n; ++p)
+        *p = c;
+      return shrink(allocated - n);
     }
 
 
@@ -123,8 +127,7 @@ namespace uformat {
       if (n >= width)
         return *this;
       size_type const spaces_count = width - n;
-      for (size_type i = 0; i != spaces_count; ++i)
-        string_.push_back(' ');
+      char_n(' ', spaces_count);
       return *this;
     }
 
@@ -138,9 +141,8 @@ namespace uformat {
       if (n >= width)
         return *this;
       size_type const spaces_count = width - n;
-      for (size_type i = 0; i != spaces_count; ++i)
-        string_.push_back(' ');
-      for (size_type i = previous_size; i != next_size; ++i)
+      char_n(' ', spaces_count);
+      for (size_type i = next_size - 1; i != previous_size - 1; --i)
         string_[i + spaces_count] = string_[i];
       for (size_type i = 0; i != spaces_count; ++i)
         string_[previous_size + i] = ' ';
@@ -412,14 +414,17 @@ namespace uformat {
     }
 
 
-    char* allocate(unsigned& n) {
+    char* allocate(size_type n, size_type& m) {
 
       size_type const old_size = string_.size();
       size_type new_size = old_size + n;
 
       if(new_size > string_.capacity()) {
         new_size = nearest_power_of_2(new_size);
-        n = unsigned(new_size - old_size);
+        m = size_type(new_size - old_size);
+      }
+      else {
+        m = n;
       }
 
       string_.resize(new_size);
@@ -438,8 +443,8 @@ namespace uformat {
 
 
     template<unsigned N, typename T> texter& print_int(T x) {
-      unsigned digits = N;
-      char* buffer = allocate(digits);
+      size_type digits;
+      char* buffer = allocate(N, digits);
       if(!buffer) return *this;
       char* p = buffer;
       convert(x, p);
@@ -451,8 +456,8 @@ namespace uformat {
     template<unsigned N, typename T> texter& print_fixed_int(T x, unsigned width) {
       if(width > N)
         width = N;
-      unsigned digits = width;
-      char* buffer = allocate(digits);
+      size_type digits;
+      char* buffer = allocate(width, digits);
       if(!buffer) return *this;
       char* p = buffer;
       convert(x, p);
@@ -472,8 +477,8 @@ namespace uformat {
 
 
     template<typename T> texter& print_fixed_float(T x, unsigned precision) {
-      unsigned digits = 38;
-      char* buffer = allocate(digits);
+      size_type digits;
+      char* buffer = allocate(38, digits);
       if(!buffer) return *this;
       char* p = buffer;
       convert(double(x), p, precision);
